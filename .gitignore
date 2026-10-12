@@ -1,0 +1,5 @@
+.env
+app/vendor/
+app/storage/logs/
+.DS_Store
+*.bak

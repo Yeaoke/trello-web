@@ -1,0 +1,80 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use App\Config\Config;
+use App\Crypto\Encryptor;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$format = static function (mixed $value): string {
+    return match (true) {
+        is_bool($value)  => $value ? 'true' : 'false',
+        $value === null  => 'null',
+        is_array($value) => json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '[]',
+        default          => (string) $value,
+    };
+};
+
+$command = $argv[1] ?? null;
+
+try {
+    switch ($command) {
+        case 'keygen':
+            echo Encryptor::generateKey(), "\n";
+            echo "Помести ключ в APP_KEY (.env)\n";
+            break;
+
+        case 'encrypt':
+            if (!isset($argv[2])) {
+                throw new \RuntimeException('Укажи значение: config encrypt <value>');
+            }
+            echo Encryptor::fromEnv()->encrypt($argv[2]), "\n";
+            break;
+
+        case 'decrypt':
+            if (!isset($argv[2])) {
+                throw new \RuntimeException('Укажи значение: config decrypt <value>');
+            }
+            echo Encryptor::fromEnv()->decrypt($argv[2]), "\n";
+            break;
+
+        case 'show':
+            $config = Config::load();
+            $filter = $argv[2] ?? null;
+            $values = $config->all();
+
+            if ($filter !== null) {
+                $values = array_filter(
+                    $values,
+                    static fn (string $key): bool => $key === $filter || str_starts_with($key, $filter . '.'),
+                    ARRAY_FILTER_USE_KEY,
+                );
+            }
+
+            if ($values === []) {
+                fwrite(STDERR, "Значения не найдены\n");
+                exit(1);
+            }
+
+            $width = max(array_map('strlen', array_keys($values)));
+            foreach ($values as $key => $value) {
+                echo str_pad($key, $width), ' = ', $format($value), "\n";
+            }
+            break;
+
+        default:
+            fwrite(STDERR, "Использование: config <keygen|encrypt|decrypt|show> [args]\n");
+            fwrite(STDERR, "  keygen          - сгенерировать новый APP_KEY\n");
+            fwrite(STDERR, "  encrypt <value> - зашифровать значение\n");
+            fwrite(STDERR, "  decrypt <value> - расшифровать значение\n");
+            fwrite(STDERR, "  show [key]      - показать конфиг текущего APP_ENV\n");
+            exit(1);
+    }
+
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Ошибка конфигурации: ' . $e->getMessage() . "\n");
+    exit(1);
+}

@@ -1,0 +1,97 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Migrations\DatabaseMigrationRepository;
+use Illuminate\Database\Migrations\Migrator;
+use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Facade;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$command = $argv[1] ?? 'up';
+
+if (!in_array($command, ['up', 'down', 'status', 'refresh'], true)) {
+    fwrite(STDERR, "Использование: migrate [up|down|status|refresh]\n");
+    exit(1);
+}
+
+try {
+    /** @var Capsule $capsule */
+    $capsule = \App\Database::boot();
+
+    $container = $capsule->getContainer();
+    $manager = $capsule->getDatabaseManager();
+
+    Facade::setFacadeApplication($container);
+
+    $container->instance('db', $manager);
+
+    $container->bind('db.schema', fn ($app) => $app['db']->connection()->getSchemaBuilder());
+
+    $repository = new DatabaseMigrationRepository($manager, 'migrations');
+
+    if (!$repository->repositoryExists()) {
+        $repository->createRepository();
+    }
+
+    $migrator = new Migrator($repository, $manager, new Filesystem());
+
+    $paths = [__DIR__ . '/../database/migrations'];
+
+    switch ($command) {
+        case 'up':
+            $migrator->run($paths);
+            echo "Миграции применены.\n";
+            break;
+        case 'down':
+            $migrator->rollback($paths);
+            echo "Миграции откатены.\n";
+            break;
+        case 'status':
+            $ran = $repository->getRan();
+            $batches = $repository->getMigrationBatches();
+            $files = $migrator->getMigrationFiles($paths);
+
+            $rows = [];
+            foreach ($files as $file) {
+                $name = $migrator->getMigrationName($file);
+                if (in_array($name, $ran, true)) {
+                    $batch = $batches[$name] ?? '?';
+                    $rows[] = [$name, sprintf('[%s] Ran', $batch)];
+                } else {
+                    $rows[] = [$name, 'Pending'];
+                }
+            }
+
+            if ($rows === []) {
+                echo "Миграции не найдены.\n";
+                break;
+            }
+
+            $nameWidth = max(mb_strlen('Migration name'), ...array_map(static fn (array $r): int => mb_strlen($r[0]), $rows));
+            $statusWidth = max(mb_strlen('Batch/Status'), ...array_map(static fn (array $r): int => mb_strlen($r[1]), $rows));
+            $line = '+' . str_repeat('-', $nameWidth + 2) . '+' . str_repeat('-', $statusWidth + 2) . '+';
+
+            echo $line, "\n";
+            echo '| ' . str_pad('Migration name', $nameWidth) . ' | ' . str_pad('Batch/Status', $statusWidth) . " |\n";
+            echo $line, "\n";
+            foreach ($rows as $row) {
+                echo '| ' . str_pad($row[0], $nameWidth) . ' | ' . str_pad($row[1], $statusWidth) . " |\n";
+            }
+            echo $line, "\n";
+            break;
+        case 'refresh':
+            $migrator->rollback($paths);
+            $migrator->run($paths);
+            echo "Миграции обновлены (rollback + run).\n";
+            break;
+    }
+
+    exit(0);
+} catch (Throwable $e) {
+    fwrite(STDERR, 'Ошибка миграции: ' . $e->getMessage() . "\n");
+    exit(1);
+}
