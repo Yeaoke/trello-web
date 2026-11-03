@@ -37,7 +37,26 @@ try {
         $repository->createRepository();
     }
 
-    $migrator = new Migrator($repository, $manager, new Filesystem());
+    $migrator = new class($repository, $manager, new Filesystem()) extends Migrator {
+        protected function getMigrationsForRollback(array $options) {
+            $migrations = parent::getMigrationsForRollback($options);
+            usort($migrations, static function ($a, $b) {
+                $a = (object) $a;
+                $b = (object) $b;
+                return [str_contains($a->migration, 'create_users_table') ? 1 : 0, $b->migration]
+                    <=> [str_contains($b->migration, 'create_users_table') ? 1 : 0, $a->migration];
+            });
+            return $migrations;
+        }
+        public function getMigrationFiles($paths) {
+            $files = parent::getMigrationFiles($paths);
+            // The historical notes filename predates the users table it references.
+            uksort($files, static fn ($a, $b) =>
+                [str_contains($a, 'create_users_table') ? 0 : 1, $a]
+                <=> [str_contains($b, 'create_users_table') ? 0 : 1, $b]);
+            return $files;
+        }
+    };
 
     $paths = [__DIR__ . '/../database/migrations'];
 

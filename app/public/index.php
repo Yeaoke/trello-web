@@ -30,14 +30,20 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
         http_response_code(422);
         $validationError = 'Заполните все поля';
     } else {
+        $writeStart = hrtime(true);
+        $writeOutcome = 'error';
         try {
-            \App\Models\Note::create(['title' => $title, 'content' => $content]);
+            \App\Models\Note::create(['user_id' => (int) (getenv('DEMO_USER_ID') ?: 1), 'title' => $title, 'content' => $content]);
+            $writeOutcome = 'success';
+            \App\Metrics::noteCreated();
         } catch (\Throwable $e) {
             $logger->error('note.create_failed', ['error' => $e->getMessage()]);
             http_response_code(302);
             header('Location: /?err=1');
-            exit;
+        } finally {
+            \App\Metrics::noteWriteCompleted($writeOutcome, (hrtime(true) - $writeStart) / 1e9);
         }
+        if ($writeOutcome === 'error') { exit; }
         http_response_code(302);
         header('Location: /');
         exit;
@@ -46,7 +52,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 
 // ------------------------------------------------------------------------------------------ //
 
-$notes = \App\Models\Note::query()->orderByDesc('id')->get();
+$notes = \App\Models\Note::query()->orderByDesc('note_id')->get();
 
 $pgError = null;
 $pgVersion = null;
@@ -339,8 +345,8 @@ main { animation: rise .45s var(--ease) .07s both; }
                     <?php foreach ($notes as $note): ?>
                         <article class="note">
                             <div class="note-meta">
-                                <span class="note-id">№ <?= h((string) $note->id) ?></span>
-                                <span><?= h((string) $note->created_at) ?></span>
+                                <span class="note-id">№ <?= h((string) $note->note_id) ?></span>
+                                <span><?= h((string) $note->created_datetime) ?></span>
                             </div>
                             <h3 class="note-title"><?= h((string) $note->title) ?></h3>
                             <p class="note-body"><?= h((string) $note->content) ?></p>

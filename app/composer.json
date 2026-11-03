@@ -1,6 +1,6 @@
 {
   "name": "agzamus/webl",
-  "description": "Дз по лекции",
+  "description": "\u0414\u0437 \u043f\u043e \u043b\u0435\u043a\u0446\u0438\u0438",
   "type": "project",
   "require": {
     "php": ">=8.5",
@@ -8,7 +8,8 @@
     "illuminate/database": "^12.0",
     "illuminate/events": "^12.0",
     "illuminate/filesystem": "^12.0",
-    "monolog/monolog": "^3.0"
+    "monolog/monolog": "^3.0",
+    "promphp/prometheus_client_php": "^2.15"
   },
   "autoload": {
     "psr-4": {

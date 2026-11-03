@@ -1,0 +1,10 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+require __DIR__ . '/../vendor/autoload.php';
+\App\Database::boot();
+$user = \App\Models\User::firstOrCreate(
+    ['email' => 'demo@sortix.invalid'],
+    ['name' => 'Demo', 'password_hash' => password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT)]
+);
+echo 'DEMO_USER_ID=' . $user->getKey() . PHP_EOL;

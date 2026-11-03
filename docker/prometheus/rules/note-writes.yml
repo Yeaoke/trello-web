@@ -1,0 +1,12 @@
+groups:
+  - name: note-writes
+    rules:
+      - alert: NoteWriteErrors
+        expr: sum by (job, instance) (increase(app_note_write_operations_total{job="app",outcome="error"}[1m])) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Ошибки сохранения заметок"
+          description: "Ошибки записи продолжаются больше двух минут. HTTP 302 и успешный SELECT 1 не гарантируют возможность INSERT."
+          runbook_url: "https://github.com/Yeaoke/trello-web/blob/main/docs/runbooks/NoteWriteErrors.md"

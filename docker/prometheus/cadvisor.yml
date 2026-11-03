@@ -1,0 +1,4 @@
+# Add this scrape_config to prometheus.yml only when cAdvisor is enabled.
+job_name: cadvisor
+static_configs:
+  - targets: ["cadvisor:8080"]

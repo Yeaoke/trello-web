@@ -9,6 +9,7 @@ endif
 
 help:
 	@echo "Доступные команды:"
+	@echo "  make mon-up / mon-check / mon-reload / pg-monitoring / seed-demo - мониторинг"
 	@echo "  make init             - создать .env из .env.example и подставить UID/GID текущего пользователя"
 	@echo "  make build            - собрать Docker-образы (docker compose build)"
 	@echo "  make up               - запустить контейнеры в фоне (docker compose up -d)"
@@ -83,3 +84,28 @@ sh:
 
 psql:
 	docker compose exec db psql -U $(POSTGRES_USER) -d $(POSTGRES_DB)
+
+
+MON = docker compose -f compose.yaml -f compose.monitoring.yaml
+.PHONY: mon-up mon-check mon-reload pg-monitoring seed-demo
+mon-up:
+	$(MON) build
+	$(MON) run --rm --no-deps app composer install
+	$(MON) up -d
+	$(MON) exec app php bin/migrate up
+	$(MON) exec app php bin/seed-demo
+	$(MAKE) pg-monitoring
+
+seed-demo:
+	docker compose exec app php bin/seed-demo
+
+pg-monitoring:
+	$(MON) exec db sh /docker-entrypoint-initdb.d/02-monitoring.sh
+
+mon-check:
+	$(MON) exec prometheus promtool check config /etc/prometheus/prometheus.yml
+	$(MON) exec prometheus promtool test rules /etc/prometheus/tests/note-writes.yml
+	$(MON) exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+
+mon-reload:
+	$(MON) restart prometheus alertmanager grafana

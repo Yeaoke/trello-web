@@ -1,0 +1,48 @@
+rule_files:
+  - ../rules/note-writes.yml
+evaluation_interval: 15s
+tests:
+  - name: sustained-errors
+    interval: 15s
+    input_series:
+      - series: 'app_note_write_operations_total{job="app",instance="nginx:8081",outcome="error"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: NoteWriteErrors
+        exp_alerts:
+          - exp_labels:
+              job: app
+              instance: nginx:8081
+              severity: warning
+            exp_annotations:
+              summary: "Ошибки сохранения заметок"
+              description: "Ошибки записи продолжаются больше двух минут. HTTP 302 и успешный SELECT 1 не гарантируют возможность INSERT."
+              runbook_url: "https://github.com/Yeaoke/trello-web/blob/main/docs/runbooks/NoteWriteErrors.md"
+  - name: idle
+    interval: 15s
+    input_series:
+      - series: 'app_note_write_operations_total{job="app",instance="nginx:8081",outcome="error"}'
+        values: '0+0x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NoteWriteErrors
+        exp_alerts: []
+  - name: one-error-and-recovery
+    interval: 15s
+    input_series:
+      - series: 'app_note_write_operations_total{job="app",instance="nginx:8081",outcome="error"}'
+        values: '0 1+0x20'
+    alert_rule_test:
+      - eval_time: 2m30s
+        alertname: NoteWriteErrors
+        exp_alerts: []
+  - name: counter-reset
+    interval: 15s
+    input_series:
+      - series: 'app_note_write_operations_total{job="app",instance="nginx:8081",outcome="error"}'
+        values: '10+0x4 0+0x16'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: NoteWriteErrors
+        exp_alerts: []
